@@ -1,0 +1,7 @@
+Subham Das is an AI/ML engineer focused on building production-ready generative AI systems, including retrieval-augmented generation, LLM applications, agentic AI, and scalable backends.
+
+At Fidelity Investments, Subham built an enterprise RAG chatbot integrating Confluence and SharePoint, standardized Docker multi-stage builds to reduce deployment cycle time by 40%, and delivered internal AI tooling and operational dashboards. Previously, as an AI intern at Sphere Soft Solutions, Subham worked on chatbots, automation, machine-learning models, and backend APIs.
+
+Independent projects include Dora AI, a multimodal system for EU DORA compliance; a natural-language-to-SQL system reported at 94% accuracy; and an LLM migration that reduced P95 response time by 67%.
+
+Subham's technical stack includes Python, LangChain, LangGraph, FAISS, Pinecone, FastAPI, Django, AWS Lambda, AWS S3, Docker, and GPT-4o. Subham holds a bachelor's degree in Computer Engineering from Biju Patnaik University of Technology and is seeking full-time AI/ML or Generative AI engineering roles.

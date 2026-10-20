@@ -1,0 +1,120 @@
+{
+  "full_name": "Subham Das",
+  "name": "Subham",
+  "current_role": "AI/ML Engineer",
+  "professional_headline": "AI/ML Engineer specializing in LLMs, agentic AI, vector databases, and scalable backends; former Software Apprentice at Fidelity Investments",
+  "career_status": "Seeking full-time AI/ML Engineer or Generative AI Engineer roles",
+  "location": "Bengaluru, Karnataka, India",
+  "email": "subhamwitted@gmail.com",
+  "linkedin": "https://www.linkedin.com/in/subham-das-datascientist",
+  "years_experience": 1,
+  "specialties": [
+    "Artificial Intelligence and Machine Learning",
+    "Generative AI and large language models",
+    "Agentic AI",
+    "Retrieval-augmented generation (RAG)",
+    "Natural language processing",
+    "Vector databases",
+    "Data science and exploratory data analysis",
+    "Python programming",
+    "Backend and API development",
+    "Scalable AI systems",
+    "Docker and deployment optimization"
+  ],
+  "technical_stack": [
+    "Python",
+    "LangChain",
+    "LangGraph",
+    "FAISS",
+    "Pinecone",
+    "FastAPI",
+    "Django",
+    "AWS Lambda",
+    "AWS S3",
+    "Docker",
+    "GPT-4o",
+    "Apache Spark",
+    "Power BI",
+    "Splunk"
+  ],
+  "experience": [
+    {
+      "company": "Fidelity Investments",
+      "roles": [
+        "Apprentice",
+        "Software Engineer"
+      ],
+      "period": "September 2025 - September 2026",
+      "location": "Bengaluru, Karnataka, India",
+      "highlights": [
+        "Standardized Docker multi-stage builds across the team's containerization pipeline, cutting deployment cycle time by 40%.",
+        "Built an enterprise RAG chatbot integrating Confluence and SharePoint APIs to reduce manual effort searching internal knowledge.",
+        "Designed and shipped a Django demo application with end-to-end testing to secure OAuth approval for an internal AI tool.",
+        "Investigated production failures using Splunk and reported root-cause findings to cloud teams under DARN compliance protocols.",
+        "Built Power BI dashboards giving leadership real-time visibility into system metrics."
+      ]
+    },
+    {
+      "company": "Sphere Soft Solutions India Private Limited",
+      "role": "Artificial Intelligence Intern",
+      "period": "June 2025 - September 2025",
+      "location": "Hyderabad, Telangana, India",
+      "highlights": [
+        "Developed chatbot and automation solutions combining natural language processing with real-time data handling.",
+        "Designed conversational workflows, fine-tuned machine learning models, and implemented backend APIs to improve response accuracy and speed.",
+        "Collaborated with cross-functional teams on scalable AI features and strengthened practical experience with Python, FastAPI, and LLM integration."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Dora AI",
+      "description": "A multimodal RegTech system for EU DORA compliance built using GPT-4o."
+    },
+    {
+      "name": "Natural-language-to-SQL system",
+      "description": "A system enabling non-technical analysts to query data in natural language, reported at 94% accuracy."
+    },
+    {
+      "name": "LLM latency optimization",
+      "description": "An LLM migration that reduced P95 response time by 67%."
+    }
+  ],
+  "certifications": [
+    "Apache Spark Developer using Python",
+    "Artificial Intelligence Engineer",
+    "Data Science Master Program Capstone Project",
+    "BCG - Data Science Job Simulation",
+    "Python for Data Science"
+  ],
+  "languages": [
+    {
+      "language": "English",
+      "proficiency": "Professional Working"
+    },
+    {
+      "language": "Odia",
+      "proficiency": "Limited Working"
+    },
+    {
+      "language": "Hindi",
+      "proficiency": "Professional Working"
+    }
+  ],
+  "education": [
+    {
+      "degree": "Bachelor's Degree in Computer Engineering",
+      "institution": "Biju Patnaik University of Technology, Odisha",
+      "period": "September 2021 - May 2024"
+    },
+    {
+      "degree": "Diploma in Electrical Engineering",
+      "institution": "Indira Gandhi Institute of Technology",
+      "period": "August 2018 - May 2021"
+    },
+    {
+      "degree": "Bachelor of Technology in Computer Engineering",
+      "institution": "Synergy Institute of Engineering and Technology"
+    }
+  ]
+}
