@@ -1,92 +1,71 @@
-#!/bin/bash
-set -e
+param(
+    [Parameter(Mandatory=$true)]
+    [string]$Environment,
+    [string]$ProjectName = "twin"
+)
 
-ENVIRONMENT=${1:-dev}          # dev | test | prod
-PROJECT_NAME=${2:-twin}
-
-run_checked() {
-  local description="$1"
-  shift
-  if "$@"; then
-    return 0
-  else
-    local status=$?
-    echo "Error: ${description} failed (exit code ${status})." >&2
-    exit "$status"
-  fi
+# Validate environment parameter
+if ($Environment -notmatch '^(dev|test|prod)$') {
+    Write-Host "Error: Invalid environment '$Environment'" -ForegroundColor Red
+    Write-Host "Available environments: dev, test, prod" -ForegroundColor Yellow
+    exit 1
 }
 
-capture_checked() {
-  local output_name="$1"
-  local description="$2"
-  shift 2
-  local output
-  if output=$("$@"); then
-    printf -v "$output_name" '%s' "$output"
-  else
-    local status=$?
-    echo "Error: ${description} failed (exit code ${status})." >&2
-    exit "$status"
-  fi
+Write-Host "Preparing to destroy $ProjectName-$Environment infrastructure..." -ForegroundColor Yellow
+
+# Navigate to terraform directory
+Set-Location (Join-Path (Split-Path $PSScriptRoot -Parent) "terraform")
+
+# Check if workspace exists
+$workspaces = terraform workspace list
+if (-not ($workspaces | Select-String $Environment)) {
+    Write-Host "Error: Workspace '$Environment' does not exist" -ForegroundColor Red
+    Write-Host "Available workspaces:" -ForegroundColor Yellow
+    terraform workspace list
+    exit 1
 }
 
-echo "🚀 Deploying ${PROJECT_NAME} to ${ENVIRONMENT}..."
+# Select the workspace
+terraform workspace select $Environment
 
-# 1. Build Lambda package
-cd "$(dirname "$0")/.."        # project root
-echo "📦 Building Lambda package..."
-run_checked "Building Lambda package" bash -c 'cd backend && uv run deploy.py'
+Write-Host "Emptying S3 buckets..." -ForegroundColor Yellow
 
-# 2. Terraform workspace & apply
-cd terraform
-run_checked "Terraform init" terraform init -input=false
+# Get AWS Account ID for bucket names
+$awsAccountId = aws sts get-caller-identity --query Account --output text
 
-capture_checked WORKSPACES "Listing Terraform workspaces" terraform workspace list
-if ! printf '%s\n' "$WORKSPACES" | grep -Eq "^[[:space:]]*\\*?[[:space:]]*${ENVIRONMENT}[[:space:]]*$"; then
-  run_checked "Creating Terraform workspace" terraform workspace new "$ENVIRONMENT"
-else
-  run_checked "Selecting Terraform workspace" terraform workspace select "$ENVIRONMENT"
-fi
+# Define bucket names with account ID
+$FrontendBucket = "$ProjectName-$Environment-frontend-$awsAccountId"
+$MemoryBucket = "$ProjectName-$Environment-memory-$awsAccountId"
 
-# Use prod.tfvars for production environment
-if [ "$ENVIRONMENT" = "prod" ]; then
-  TF_APPLY_CMD=(terraform apply -var-file=prod.tfvars -var="project_name=$PROJECT_NAME" -var="environment=$ENVIRONMENT" -auto-approve)
-else
-  TF_APPLY_CMD=(terraform apply -var="project_name=$PROJECT_NAME" -var="environment=$ENVIRONMENT" -auto-approve)
-fi
+# Empty frontend bucket if it exists
+try {
+    aws s3 ls "s3://$FrontendBucket" 2>$null | Out-Null
+    Write-Host "  Emptying $FrontendBucket..." -ForegroundColor Gray
+    aws s3 rm "s3://$FrontendBucket" --recursive
+} catch {
+    Write-Host "  Frontend bucket not found or already empty" -ForegroundColor Gray
+}
 
-echo "🎯 Applying Terraform..."
-run_checked "Terraform apply" "${TF_APPLY_CMD[@]}"
+# Empty memory bucket if it exists
+try {
+    aws s3 ls "s3://$MemoryBucket" 2>$null | Out-Null
+    Write-Host "  Emptying $MemoryBucket..." -ForegroundColor Gray
+    aws s3 rm "s3://$MemoryBucket" --recursive
+} catch {
+    Write-Host "  Memory bucket not found or already empty" -ForegroundColor Gray
+}
 
-capture_checked API_URL "Reading API Gateway URL" terraform output -raw api_gateway_url
-capture_checked FRONTEND_BUCKET "Reading frontend bucket" terraform output -raw s3_frontend_bucket
-capture_checked MEMORY_BUCKET "Reading memory bucket" terraform output -raw s3_memory_bucket
-capture_checked FRONTEND_URL "Reading frontend URL" terraform output -raw frontend_url
-capture_checked LEGACY_MEMORY_BUCKET "Reading legacy memory bucket" terraform output -raw legacy_s3_memory_bucket
+Write-Host "Running terraform destroy..." -ForegroundColor Yellow
 
-if [[ -z "$API_URL" || -z "$FRONTEND_BUCKET" || -z "$MEMORY_BUCKET" || -z "$FRONTEND_URL" || -z "$LEGACY_MEMORY_BUCKET" ]]; then
-  echo "Error: Terraform returned an empty required output." >&2
-  exit 1
-fi
+# Run terraform destroy with auto-approve
+if ($Environment -eq "prod" -and (Test-Path "prod.tfvars")) {
+    terraform destroy -var-file="prod.tfvars" -var="project_name=$ProjectName" -var="environment=$Environment" -auto-approve
+} else {
+    terraform destroy -var="project_name=$ProjectName" -var="environment=$Environment" -auto-approve
+}
 
-# Copy existing memory data without deleting the source bucket.
-run_checked "Migrating memory data to us-east-1" aws s3 sync \
-  "s3://${LEGACY_MEMORY_BUCKET}" "s3://${MEMORY_BUCKET}" \
-  --source-region eu-north-1 --region us-east-1 --only-show-errors
-
-# 3. Build + deploy frontend
-cd ../frontend
-
-# Create production environment file with API URL
-echo "📝 Setting API URL for production..."
-echo "NEXT_PUBLIC_API_URL=$API_URL" > .env.production
-
-run_checked "Installing frontend dependencies" npm install
-run_checked "Building frontend" npm run build
-run_checked "Uploading frontend" aws s3 sync ./out "s3://${FRONTEND_BUCKET}/" --delete
-cd ..
-
-# 4. Final messages
-echo -e "\n✅ Deployment complete!"
-echo "🌐 Frontend URL   : $FRONTEND_URL"
-echo "📡 API Gateway    : $API_URL"
+Write-Host "Infrastructure for $Environment has been destroyed!" -ForegroundColor Green
+Write-Host ""
+Write-Host "  To remove the workspace completely, run:" -ForegroundColor Cyan
+Write-Host "   terraform workspace select default" -ForegroundColor White
+Write-Host "   terraform workspace delete $Environment" -ForegroundColor White

@@ -30,7 +30,16 @@ Set-Location ..
 
 # 2. Terraform workspace & apply
 Set-Location terraform
-Invoke-CheckedNativeCommand { terraform init -input=false } "Terraform init"
+$AwsAccountId = Invoke-CheckedNativeCommand { aws sts get-caller-identity --query Account --output text } "Getting AWS account ID"
+$AwsRegion = if ($env:DEFAULT_AWS_REGION) { $env:DEFAULT_AWS_REGION } else { "us-east-1" }
+Invoke-CheckedNativeCommand {
+    terraform init -input=false `
+        -backend-config="bucket=twin-terraform-state-$AwsAccountId" `
+        -backend-config="key=$Environment/terraform.tfstate" `
+        -backend-config="region=$AwsRegion" `
+        -backend-config="dynamodb_table=twin-terraform-locks" `
+        -backend-config="encrypt=true"
+} "Terraform init"
 
 $WorkspaceList = Invoke-CheckedNativeCommand { terraform workspace list } "Listing Terraform workspaces"
 $WorkspaceListText = $WorkspaceList -join "`n"

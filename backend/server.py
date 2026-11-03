@@ -1,4 +1,3 @@
-import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -30,24 +29,19 @@ app.add_middleware(
 # Initialize Bedrock client - see Q42 on https://edwarddonner.com/faq if the Region gives you problems
 bedrock_client = boto3.client(
     service_name="bedrock-runtime", 
-    region_name=os.getenv("DEFAULT_AWS_REGION", "eu-north-1")
+    region_name=os.getenv("DEFAULT_AWS_REGION", "us-east-1")
 )
 
 # Bedrock model selection - see Q42 on https://edwarddonner.com/faq for more
-BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "amazon.nova-lite-v1:0")
-BEDROCK_MAX_INPUT_CHARS = int(os.getenv("BEDROCK_MAX_INPUT_CHARS", "100000"))
-if BEDROCK_MAX_INPUT_CHARS <= 0:
-    raise ValueError("BEDROCK_MAX_INPUT_CHARS must be greater than zero")
+BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "global.amazon.nova-2-lite-v1:0")
 
 # Memory storage configuration
 USE_S3 = os.getenv("USE_S3", "false").lower() == "true"
+S3_BUCKET = os.getenv("S3_BUCKET", "")
 MEMORY_DIR = os.getenv("MEMORY_DIR", "../memory")
-S3_BUCKET = os.getenv("S3_BUCKET")
 
 # Initialize S3 client if needed
 if USE_S3:
-    if not S3_BUCKET:
-        raise ValueError("S3_BUCKET must be set when USE_S3 is true")
     s3_client = boto3.client("s3")
 
 
@@ -111,52 +105,34 @@ def save_conversation(session_id: str, messages: List[Dict]):
 
 def call_bedrock(conversation: List[Dict], user_message: str) -> str:
     """Call AWS Bedrock with conversation history"""
-    system_prompt = prompt()
-    if len(system_prompt) + len(user_message) > BEDROCK_MAX_INPUT_CHARS:
-        raise HTTPException(
-            status_code=413,
-            detail="System prompt and message exceed the configured Bedrock input limit",
-        )
-
-    history_pairs = []
-    if len(conversation) % 2:
-        raise ValueError("Conversation history must contain complete user-assistant turns")
-
-    for index in range(0, len(conversation), 2):
-        user_turn, assistant_turn = conversation[index : index + 2]
-        if (
-            user_turn.get("role") != "user"
-            or assistant_turn.get("role") != "assistant"
-            or not isinstance(user_turn.get("content"), str)
-            or not isinstance(assistant_turn.get("content"), str)
-        ):
-            raise ValueError("Conversation history contains an invalid user-assistant turn")
-        history_pairs.append((user_turn["content"], assistant_turn["content"]))
-
-    selected_pairs = []
-    input_chars = len(system_prompt) + len(user_message)
-    for user_turn, assistant_turn in reversed(history_pairs):
-        turn_chars = len(user_turn) + len(assistant_turn)
-        if input_chars + turn_chars > BEDROCK_MAX_INPUT_CHARS:
-            break
-        selected_pairs.append((user_turn, assistant_turn))
-        input_chars += turn_chars
-
+    
+    # Build messages in Bedrock format
     messages = []
-    for user_turn, assistant_turn in reversed(selected_pairs):
-        messages.extend(
-            [
-                {"role": "user", "content": [{"text": user_turn}]},
-                {"role": "assistant", "content": [{"text": assistant_turn}]},
-            ]
-        )
-    messages.append({"role": "user", "content": [{"text": user_message}]})
-
+    
+    # Add system prompt as first user message
+    # Or there's a better way to do this - pass in system=[{"text": prompt()}] to the converse call below
+    messages.append({
+        "role": "user", 
+        "content": [{"text": f"System: {prompt()}"}]
+    })
+    
+    # Add conversation history (limit to last 25 exchanges)
+    for msg in conversation[-50:]:
+        messages.append({
+            "role": msg["role"],
+            "content": [{"text": msg["content"]}]
+        })
+    
+    # Add current user message
+    messages.append({
+        "role": "user",
+        "content": [{"text": user_message}]
+    })
+    
     try:
         # Call Bedrock using the converse API
         response = bedrock_client.converse(
             modelId=BEDROCK_MODEL_ID,
-            system=[{"text": system_prompt}],
             messages=messages,
             inferenceConfig={
                 "maxTokens": 2000,
@@ -208,12 +184,10 @@ async def chat(request: ChatRequest):
         session_id = request.session_id or str(uuid.uuid4())
 
         # Load conversation history
-        conversation = await asyncio.to_thread(load_conversation, session_id)
+        conversation = load_conversation(session_id)
 
         # Call Bedrock for response
-        assistant_response = await asyncio.to_thread(
-            call_bedrock, conversation, request.message
-        )
+        assistant_response = call_bedrock(conversation, request.message)
 
         # Update conversation history
         conversation.append(
@@ -228,7 +202,7 @@ async def chat(request: ChatRequest):
         )
 
         # Save conversation
-        await asyncio.to_thread(save_conversation, session_id, conversation)
+        save_conversation(session_id, conversation)
 
         return ChatResponse(response=assistant_response, session_id=session_id)
 
@@ -243,7 +217,7 @@ async def chat(request: ChatRequest):
 async def get_conversation(session_id: str):
     """Retrieve conversation history"""
     try:
-        conversation = await asyncio.to_thread(load_conversation, session_id)
+        conversation = load_conversation(session_id)
         return {"session_id": session_id, "messages": conversation}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
